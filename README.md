@@ -64,7 +64,7 @@ The agents use the OpenAI SDK, so any OpenAI-compatible API works. Set `LLM_PROV
 
 | `LLM_PROVIDER` | Get a key | Default model | Cost |
 |---|---|---|---|
-| `gemini` | [aistudio.google.com/apikey](https://aistudio.google.com/apikey) | `gemini-2.5-flash` | free tier |
+| `gemini` | [aistudio.google.com/apikey](https://aistudio.google.com/apikey) | `gemini-flash-latest` | free tier |
 | `groq` | [console.groq.com/keys](https://console.groq.com/keys) | `openai/gpt-oss-20b` | free tier |
 | `openrouter` | [openrouter.ai/settings/keys](https://openrouter.ai/settings/keys) | `openai/gpt-4.1-mini` | pay per use, many models |
 | `openai` | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) | `gpt-4.1-mini` | pay per use |

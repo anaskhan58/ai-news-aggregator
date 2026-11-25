@@ -14,7 +14,7 @@ from datetime import date
 from pathlib import Path
 
 from app.agent import CuratorAgent, DigestAgent, EmailAgent
-from app.agent.base import model_name
+from app.agent.base import LLMConfigError, model_name
 from app.config import ROOT_DIR, settings
 from app.database import Article, Repository, create_tables, describe_database, get_session
 from app.scrapers import build_scrapers
@@ -61,6 +61,8 @@ def generate_digests(hours: int) -> int:
             text = article.content or article.description or article.title
             try:
                 result = agent.summarize(article.source, article.title, text)
+            except LLMConfigError:
+                raise  # wrong model/key: stop the run so it shows up as failed
             except Exception:
                 logger.exception("[digest] failed for %s", article.id)
                 continue

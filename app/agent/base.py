@@ -10,13 +10,24 @@ import logging
 from dataclasses import dataclass
 from typing import TypeVar
 
-from openai import BadRequestError, OpenAI, UnprocessableEntityError
+from openai import (
+    AuthenticationError,
+    BadRequestError,
+    NotFoundError,
+    OpenAI,
+    PermissionDeniedError,
+    UnprocessableEntityError,
+)
 from pydantic import BaseModel, ValidationError
 
 from app.config import settings
 
 T = TypeVar("T", bound=BaseModel)
 logger = logging.getLogger(__name__)
+
+
+class LLMConfigError(RuntimeError):
+    """Wrong model name or API key: every call would fail, so the pipeline stops instead of skipping."""
 
 
 @dataclass(frozen=True)
@@ -31,7 +42,7 @@ PROVIDERS = {
     "openai": Provider(None, "gpt-4.1-mini", "https://platform.openai.com/api-keys"),
     "gemini": Provider(
         "https://generativelanguage.googleapis.com/v1beta/openai/",
-        "gemini-2.5-flash",
+        "gemini-flash-latest",
         "https://aistudio.google.com/apikey",
     ),
     "groq": Provider("https://api.groq.com/openai/v1", "openai/gpt-oss-20b", "https://console.groq.com/keys"),
@@ -79,7 +90,19 @@ class BaseAgent:
         self.model = model or model_name()
 
     def run(self, user_input: str, output_type: type[T], instructions: str | None = None) -> T:
-        instructions = instructions or self.instructions
+        try:
+            return self._run(user_input, output_type, instructions or self.instructions)
+        except NotFoundError as exc:
+            raise LLMConfigError(
+                f"Model '{self.model}' was not found at provider '{settings.llm_provider}'. "
+                "Set LLM_MODEL to a current model name."
+            ) from exc
+        except (AuthenticationError, PermissionDeniedError) as exc:
+            raise LLMConfigError(
+                f"The API key was rejected by provider '{settings.llm_provider}'. Check LLM_API_KEY."
+            ) from exc
+
+    def _run(self, user_input: str, output_type: type[T], instructions: str) -> T:
         if settings.llm_provider == "openai":
             return self._responses_api(instructions, user_input, output_type)
         try:
