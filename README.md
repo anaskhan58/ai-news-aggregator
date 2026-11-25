@@ -39,7 +39,8 @@ app/
   profiles/user_profile.py   who the digest is for - edit this!
   services/email.py      HTML rendering + Gmail SMTP
 docker/docker-compose.yml   local Postgres
-Dockerfile, render.yaml     deployment
+.github/workflows/          free daily run on GitHub Actions
+Dockerfile, render.yaml     deployment to Render (paid alternative)
 main.py                     CLI entry point
 ```
 
@@ -99,7 +100,33 @@ class HuggingFaceScraper(RSSScraper):
 - **Email look:** `render_html()` in `app/services/email.py`
 - **Prompts:** the `instructions` in each agent file
 
-## Deploy to Render (daily cron)
+## Deploy for free: GitHub Actions + Neon Postgres
+
+`.github/workflows/daily-digest.yml` runs the pipeline every day at 01:30 UTC (07:00 IST).
+GitHub Actions minutes are free for public repos, and Neon's free Postgres doesn't expire.
+
+1. **Database:** create a free project at [neon.tech](https://neon.tech) → copy the connection string
+   (`postgresql://…neon.tech/neondb?sslmode=require…`).
+2. **Secrets:** repo → **Settings → Secrets and variables → Actions → New repository secret**, or from a terminal
+   (`gh secret set` prompts for the value, so it never lands in your shell history):
+
+   ```bash
+   gh secret set DATABASE_URL     # Neon connection string
+   gh secret set LLM_API_KEY      # e.g. Gemini key
+   gh secret set MY_EMAIL         # your Gmail address
+   gh secret set APP_PASSWORD     # Gmail app password
+   ```
+
+   Optional: `EMAIL_TO`, `WEBSHARE_USERNAME`, `WEBSHARE_PASSWORD`. To use another provider than Gemini,
+   add a **variable** (not a secret) `LLM_PROVIDER` (and optionally `LLM_MODEL`, `TOP_N`).
+3. **Test:** **Actions → Daily AI news digest → Run workflow** (tick *Dry run* to get the email as a
+   downloadable artifact instead of sending it), or `gh workflow run daily-digest.yml`.
+
+Notes: GitHub may start scheduled runs a few minutes late, and it pauses schedules in public repos after
+60 days without commits (the Actions tab shows a button to re-enable). YouTube often blocks transcript
+requests from cloud IPs; videos then fall back to their description unless the Webshare proxy is set.
+
+## Deploy to Render (daily cron, paid)
 
 1. Push this repo to GitHub.
 2. Render → **New → Blueprint** → select the repo. `render.yaml` creates a Postgres database and a
