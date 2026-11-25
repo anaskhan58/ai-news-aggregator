@@ -7,15 +7,20 @@ Every provider below speaks the OpenAI API, so one SDK covers all of them:
 
 import json
 import logging
+import time
 from dataclasses import dataclass
 from typing import TypeVar
 
 from openai import (
+    APIConnectionError,
+    APITimeoutError,
     AuthenticationError,
     BadRequestError,
+    InternalServerError,
     NotFoundError,
     OpenAI,
     PermissionDeniedError,
+    RateLimitError,
     UnprocessableEntityError,
 )
 from pydantic import BaseModel, ValidationError
@@ -36,6 +41,7 @@ class Provider:
     default_model: str
     key_url: str = ""
     needs_key: bool = True
+    min_interval: float = 0.0  # seconds between requests, to stay under free-tier rate limits
 
 
 PROVIDERS = {
@@ -44,8 +50,11 @@ PROVIDERS = {
         "https://generativelanguage.googleapis.com/v1beta/openai/",
         "gemini-flash-latest",
         "https://aistudio.google.com/apikey",
+        min_interval=7.0,  # free tier allows ~10 requests/minute
     ),
-    "groq": Provider("https://api.groq.com/openai/v1", "openai/gpt-oss-20b", "https://console.groq.com/keys"),
+    "groq": Provider(
+        "https://api.groq.com/openai/v1", "openai/gpt-oss-20b", "https://console.groq.com/keys", min_interval=2.0
+    ),
     "openrouter": Provider(
         "https://openrouter.ai/api/v1", "openai/gpt-4.1-mini", "https://openrouter.ai/settings/keys"
     ),
@@ -78,8 +87,23 @@ def get_client() -> OpenAI:
         base_url = settings.llm_base_url or provider.base_url
         if settings.llm_provider == "custom" and not base_url:
             raise RuntimeError("LLM_PROVIDER=custom needs LLM_BASE_URL.")
-        _client = OpenAI(api_key=api_key or "not-needed", base_url=base_url)
+        # Retries are handled in BaseAgent.run with longer waits than the SDK's built-in ones.
+        _client = OpenAI(api_key=api_key or "not-needed", base_url=base_url, max_retries=0, timeout=120)
     return _client
+
+
+RETRY_DELAYS = (15, 30, 60, 120)  # seconds to wait after a rate-limit / server error
+_last_request = 0.0
+
+
+def _pace() -> None:
+    """Wait so consecutive requests are at least `min_interval` apart."""
+    global _last_request
+    interval = settings.llm_min_interval if settings.llm_min_interval is not None else get_provider().min_interval
+    wait = _last_request + interval - time.monotonic()
+    if wait > 0:
+        time.sleep(wait)
+    _last_request = time.monotonic()
 
 
 class BaseAgent:
@@ -90,8 +114,23 @@ class BaseAgent:
         self.model = model or model_name()
 
     def run(self, user_input: str, output_type: type[T], instructions: str | None = None) -> T:
+        instructions = instructions or self.instructions
+        for attempt, delay in enumerate((*RETRY_DELAYS, None), start=1):
+            try:
+                return self._run_once(user_input, output_type, instructions)
+            except (RateLimitError, InternalServerError, APIConnectionError, APITimeoutError) as exc:
+                if delay is None:
+                    raise
+                logger.warning(
+                    "%s: %s, retrying in %ds (attempt %d/%d)",
+                    type(self).__name__, type(exc).__name__, delay, attempt, len(RETRY_DELAYS) + 1,
+                )
+                time.sleep(delay)
+        raise AssertionError("unreachable")
+
+    def _run_once(self, user_input: str, output_type: type[T], instructions: str) -> T:
         try:
-            return self._run(user_input, output_type, instructions or self.instructions)
+            return self._run(user_input, output_type, instructions)
         except NotFoundError as exc:
             raise LLMConfigError(
                 f"Model '{self.model}' was not found at provider '{settings.llm_provider}'. "
@@ -113,6 +152,7 @@ class BaseAgent:
             return self._chat_json(instructions, user_input, output_type)
 
     def _responses_api(self, instructions: str, user_input: str, output_type: type[T]) -> T:
+        _pace()
         response = get_client().responses.parse(
             model=self.model,
             instructions=instructions,
@@ -123,6 +163,7 @@ class BaseAgent:
         return self._require(response.output_parsed)
 
     def _chat_structured(self, instructions: str, user_input: str, output_type: type[T]) -> T:
+        _pace()
         completion = get_client().chat.completions.parse(
             model=self.model,
             messages=[
@@ -136,6 +177,7 @@ class BaseAgent:
 
     def _chat_json(self, instructions: str, user_input: str, output_type: type[T]) -> T:
         schema = json.dumps(output_type.model_json_schema())
+        _pace()
         completion = get_client().chat.completions.create(
             model=self.model,
             messages=[

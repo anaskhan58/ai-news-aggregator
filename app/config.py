@@ -41,6 +41,8 @@ class Settings:
     llm_model: str | None = os.getenv("LLM_MODEL")  # None -> provider default
     llm_api_key: str | None = os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY")
     llm_base_url: str | None = os.getenv("LLM_BASE_URL") or os.getenv("OLLAMA_BASE_URL")
+    # seconds between LLM requests; empty = provider default (e.g. 7s for the Gemini free tier)
+    llm_min_interval: float | None = float(os.getenv("LLM_MIN_INTERVAL")) if os.getenv("LLM_MIN_INTERVAL") else None
 
     # Email (Gmail SMTP + app password)
     email_from: str | None = os.getenv("MY_EMAIL")
