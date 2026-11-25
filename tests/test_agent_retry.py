@@ -47,6 +47,21 @@ def test_gives_up_after_all_retries(monkeypatch, no_sleep):
     assert no_sleep == list(base.RETRY_DELAYS)
 
 
+def test_daily_quota_stops_immediately(monkeypatch, no_sleep):
+    exc = _error(RateLimitError)
+    exc.message = "Error code: 429"
+    exc.body = [{"error": {"code": 429, "status": "RESOURCE_EXHAUSTED", "details": [
+        {"violations": [{"quotaId": "GenerateRequestsPerDayPerProjectPerModel-FreeTier"}]}]}}]
+
+    def quota_gone(self, *args):
+        raise exc
+
+    monkeypatch.setattr(BaseAgent, "_run", quota_gone)
+    with pytest.raises(LLMConfigError, match="Daily quota"):
+        BaseAgent(model="m").run("hi", Out)
+    assert no_sleep == []  # no pointless waiting
+
+
 def test_unknown_model_is_a_config_error_without_retry(monkeypatch, no_sleep):
     def not_found(self, *args):
         raise _error(NotFoundError)

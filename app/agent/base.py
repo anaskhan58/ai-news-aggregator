@@ -48,7 +48,7 @@ PROVIDERS = {
     "openai": Provider(None, "gpt-4.1-mini", "https://platform.openai.com/api-keys"),
     "gemini": Provider(
         "https://generativelanguage.googleapis.com/v1beta/openai/",
-        "gemini-flash-latest",
+        "gemini-flash-lite-latest",
         "https://aistudio.google.com/apikey",
         min_interval=7.0,  # free tier allows ~10 requests/minute
     ),
@@ -92,8 +92,17 @@ def get_client() -> OpenAI:
     return _client
 
 
-RETRY_DELAYS = (15, 30, 60, 120)  # seconds to wait after a rate-limit / server error
+RETRY_DELAYS = (15, 30, 60)  # seconds to wait after a per-minute rate limit / server error
 _last_request = 0.0
+
+
+def _is_daily_quota(exc: RateLimitError) -> bool:
+    """True when a 429 means the per-day quota is gone (waiting minutes won't help).
+
+    Gemini puts e.g. quotaId "GenerateRequestsPerDayPerProjectPerModel-FreeTier" in the error body.
+    """
+    text = f"{getattr(exc, 'message', '')} {json.dumps(getattr(exc, 'body', None), default=str)}".lower()
+    return "perday" in text or "per day" in text or "requests per day" in text
 
 
 def _pace() -> None:
@@ -119,6 +128,12 @@ class BaseAgent:
             try:
                 return self._run_once(user_input, output_type, instructions)
             except (RateLimitError, InternalServerError, APIConnectionError, APITimeoutError) as exc:
+                if isinstance(exc, RateLimitError) and _is_daily_quota(exc):
+                    raise LLMConfigError(
+                        f"Daily quota for model '{self.model}' at provider '{settings.llm_provider}' is used up. "
+                        "It resets daily (Gemini: midnight Pacific time). Retrying today won't help; "
+                        "set LLM_MODEL to another model or switch LLM_PROVIDER."
+                    ) from exc
                 if delay is None:
                     raise
                 logger.warning(
