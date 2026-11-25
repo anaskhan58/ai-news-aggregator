@@ -36,11 +36,11 @@ def _database_url() -> str:
 class Settings:
     database_url: str = _database_url()
 
-    # LLM: "openai" (Responses API) or "ollama" (local, OpenAI-compatible endpoint)
+    # LLM: openai | gemini | groq | openrouter | ollama | custom  (see app/agent/base.py)
     llm_provider: str = os.getenv("LLM_PROVIDER", "openai").lower()
-    llm_model: str = os.getenv("LLM_MODEL", "gpt-4.1-mini")
-    openai_api_key: str | None = os.getenv("OPENAI_API_KEY")
-    ollama_base_url: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
+    llm_model: str | None = os.getenv("LLM_MODEL")  # None -> provider default
+    llm_api_key: str | None = os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY")
+    llm_base_url: str | None = os.getenv("LLM_BASE_URL") or os.getenv("OLLAMA_BASE_URL")
 
     # Email (Gmail SMTP + app password)
     email_from: str | None = os.getenv("MY_EMAIL")

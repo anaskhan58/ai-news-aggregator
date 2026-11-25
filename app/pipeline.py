@@ -14,6 +14,7 @@ from datetime import date
 from pathlib import Path
 
 from app.agent import CuratorAgent, DigestAgent, EmailAgent
+from app.agent.base import model_name
 from app.config import ROOT_DIR, settings
 from app.database import Article, Repository, create_tables, describe_database, get_session
 from app.scrapers import build_scrapers
@@ -111,7 +112,7 @@ def send_digest(hours: int, top_n: int, dry_run: bool = False) -> Path | None:
 
 def run_daily_pipeline(hours: int, top_n: int, dry_run: bool = False, steps=None) -> None:
     steps = steps or ["scrape", "content", "digest", "email"]
-    logger.info("Database: %s | LLM: %s/%s", describe_database(), settings.llm_provider, settings.llm_model)
+    logger.info("Database: %s | LLM: %s/%s", describe_database(), settings.llm_provider, model_name())
     create_tables()
     if "scrape" in steps:
         scrape(hours)

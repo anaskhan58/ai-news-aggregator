@@ -35,7 +35,7 @@ app/
   pipeline.py            the 4 steps
   scrapers/              base.py (RSSScraper) + youtube.py + blogs.py; registry in __init__.py
   database/              models.py, connection.py, repository.py (all queries)
-  agent/                 base.py (OpenAI Responses API / Ollama) + 3 agents
+  agent/                 base.py (provider presets: OpenAI, Gemini, Groq, OpenRouter, Ollama) + 3 agents
   profiles/user_profile.py   who the digest is for - edit this!
   services/email.py      HTML rendering + Gmail SMTP
 docker/docker-compose.yml   local Postgres
@@ -47,7 +47,7 @@ main.py                     CLI entry point
 
 ```bash
 uv sync
-cp .env.example .env          # fill in OPENAI_API_KEY, MY_EMAIL, APP_PASSWORD
+cp .env.example .env          # fill in LLM_PROVIDER + LLM_API_KEY, MY_EMAIL, APP_PASSWORD
 docker compose -f docker/docker-compose.yml up -d   # local Postgres 17
 uv run main.py --check        # test DB connection
 uv run main.py --dry-run      # full run, email saved to output/ instead of sent
@@ -57,7 +57,20 @@ uv run main.py                # full run + send the email
 Useful flags: `--hours 72` (wider window), `--top 5`, `--steps scrape content` (run some steps only).
 
 **No Docker?** Set `DATABASE_URL=sqlite:///news.db` in `.env`.
-**No OpenAI key?** Set `LLM_PROVIDER=ollama` and `LLM_MODEL=llama3.2` (or a stronger local model like `qwen2.5:7b` — small models rank less reliably).
+### Choosing an LLM API
+The agents use the OpenAI SDK, so any OpenAI-compatible API works. Set `LLM_PROVIDER` and `LLM_API_KEY`
+(`LLM_MODEL` is optional):
+
+| `LLM_PROVIDER` | Get a key | Default model | Cost |
+|---|---|---|---|
+| `gemini` | [aistudio.google.com/apikey](https://aistudio.google.com/apikey) | `gemini-2.5-flash` | free tier |
+| `groq` | [console.groq.com/keys](https://console.groq.com/keys) | `openai/gpt-oss-20b` | free tier |
+| `openrouter` | [openrouter.ai/settings/keys](https://openrouter.ai/settings/keys) | `openai/gpt-4.1-mini` | pay per use, many models |
+| `openai` | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) | `gpt-4.1-mini` | pay per use |
+| `ollama` | none, runs locally | `llama3.2` | free (small models rank less reliably) |
+| `custom` | your server | set `LLM_MODEL` + `LLM_BASE_URL` | - |
+
+If a provider or model doesn't support JSON-schema structured output, the agents automatically retry in plain JSON mode.
 
 ### Gmail app password
 Needs a personal Gmail with 2-step verification on. Create one at <https://myaccount.google.com/apppasswords>,
@@ -91,7 +104,7 @@ class HuggingFaceScraper(RSSScraper):
 1. Push this repo to GitHub.
 2. Render → **New → Blueprint** → select the repo. `render.yaml` creates a Postgres database and a
    cron job (`0 6 * * *` = 06:00 UTC daily) that builds the `Dockerfile` and runs `python main.py`.
-3. Enter the secret env vars when asked (`OPENAI_API_KEY`, `MY_EMAIL`, `APP_PASSWORD`, …).
+3. Enter the secret env vars when asked (`LLM_API_KEY`, `MY_EMAIL`, `APP_PASSWORD`, …). Change `LLM_PROVIDER` in `render.yaml` if you don't use Gemini.
    `DATABASE_URL` is wired to the database automatically. Tables are created on the first run.
 4. Open the cron job → **Trigger Run** to test it right away; watch **Logs**.
 

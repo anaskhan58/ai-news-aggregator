@@ -18,7 +18,9 @@ services:
         fromDatabase:
           name: ai-news-db
           property: connectionString
-      - key: OPENAI_API_KEY
+      - key: LLM_PROVIDER
+        value: gemini        # openai | gemini | groq | openrouter
+      - key: LLM_API_KEY
         sync: false
       - key: MY_EMAIL
         sync: false
@@ -30,8 +32,6 @@ services:
         sync: false
       - key: WEBSHARE_PASSWORD
         sync: false
-      - key: LLM_MODEL
-        value: gpt-4.1-mini
       - key: LOOKBACK_HOURS
         value: "24"
       - key: TOP_N
