@@ -2,6 +2,14 @@
 
 Every day: scrape AI news from YouTube channels and the OpenAI / Anthropic blogs, summarise each
 item with an LLM, rank everything against **your** profile, and email you the top 10.
+Runs free on GitHub Actions + Neon Postgres.
+
+<p align="center">
+  <img src="docs/digest-email.png" alt="Example daily digest email: an LLM-written intro followed by ranked AI news stories with summaries and links" width="560">
+  <br><em>A real digest from the deployed pipeline (stories ranked by relevance to the reader's profile)</em>
+</p>
+
+## Architecture
 
 ```mermaid
 flowchart LR
