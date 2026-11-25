@@ -38,7 +38,8 @@ def main() -> int:
 
     from app.pipeline import run_daily_pipeline
 
-    logging.getLogger("httpx").setLevel(logging.WARNING)  # re-apply after the SDK import
+    for noisy in ("httpx", "httpx2"):  # newer openai SDKs log every request via httpx2
+        logging.getLogger(noisy).setLevel(logging.WARNING)
     run_daily_pipeline(args.hours, args.top, args.dry_run, args.steps)
     return 0
 
