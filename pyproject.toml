@@ -1,0 +1,23 @@
+[project]
+name = "ai-news-aggregator"
+version = "0.1.0"
+description = "Daily personalised AI news digest: scrape YouTube + blogs, summarise with an LLM, email the top stories."
+requires-python = ">=3.12"
+dependencies = [
+    "beautifulsoup4>=4.15.0",
+    "feedparser>=6.0.14",
+    "markdown>=3.11.3",
+    "markdownify>=1.2.4",
+    "openai>=3.59.0",
+    "psycopg[binary]>=3.2",
+    "pydantic>=2.14.4",
+    "python-dotenv>=1.2.4",
+    "requests>=2.34.2",
+    "sqlalchemy>=2.0",
+    "youtube-transcript-api>=1.2.5",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+]

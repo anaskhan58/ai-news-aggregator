@@ -1,0 +1,38 @@
+# Render Blueprint: a Postgres database + a daily cron job that runs main.py.
+# Render dashboard -> New -> Blueprint -> pick this repo. You'll be asked for the sync:false values.
+databases:
+  - name: ai-news-db
+    databaseName: ai_news_aggregator
+    user: ai_news
+    plan: free
+
+services:
+  - type: cron
+    name: daily-digest-job
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    schedule: "0 6 * * *"   # every day 06:00 UTC
+    plan: starter
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ai-news-db
+          property: connectionString
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: MY_EMAIL
+        sync: false
+      - key: APP_PASSWORD
+        sync: false
+      - key: EMAIL_TO
+        sync: false
+      - key: WEBSHARE_USERNAME
+        sync: false
+      - key: WEBSHARE_PASSWORD
+        sync: false
+      - key: LLM_MODEL
+        value: gpt-4.1-mini
+      - key: LOOKBACK_HOURS
+        value: "24"
+      - key: TOP_N
+        value: "10"
